@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/ruby -w
 
 require 'optparse'
 require 'rubygems'
@@ -8,7 +8,8 @@ options = {:host => 'localhost',
           :port => 6379,
           :db => 0,
           :password => nil,
-          :timeout => 3}
+          :timeout => 3,
+          :last_io => 300}
 
 optparser = OptionParser.new do |opt|
   opt.banner = "Usage: #{$0} -H <hostname> [options]"
@@ -16,7 +17,7 @@ optparser = OptionParser.new do |opt|
   opt.on('-p', '--port', 'Port (Default: "6379")') {|o| options[:port] = o if o }
   opt.on('-P', '--password PASSWORD', 'Password (Default: blank)') {|o| options[:password] = o if o }
   opt.on('-T', '--timeout', 'Timeout in seconds (Default: 3)') {|o| options[:timeout] = o if o }
-  opt.on('-L', '--last_io', "Max master_last_io_seconds") {|o| options[:last_io] = o if o}
+  opt.on('-L', '--last_io SECONDS', "Max master_last_io_seconds") {|o| options[:last_io] = o.to_i if o}
 end
 
 args = []
@@ -31,7 +32,8 @@ end
 class CheckRedisReplication
 
   def initialize(opts)
-    @keys = %w(master_host master_last_io_seconds master_link_status role)
+    @options = opts
+    @keys = %w(master_host master_last_io_seconds_ago master_link_status role)
     @r = Redis.new(opts)
     gather_stats
   rescue Errno::ECONNREFUSED
@@ -51,8 +53,8 @@ class CheckRedisReplication
     @info = @r.info
     parse_info
     status = get_status
-    if (@role == "slave" && master_link_status == "up" && @master_last_io_seconds)
-      if (@master_last_io_seconds.to_i < 300)
+    if (@role == "slave" && @master_link_status == "up" && @last_io)
+      if (@last_io.to_i < @options[:last_io])
         print "OK - #{status}"
         exit 0
       else
@@ -66,7 +68,7 @@ class CheckRedisReplication
   end
 
   def get_status
-    "#{@role} of #{@master_host} link #{@master_link_status} last_io #{@master_last_io_seconds}"
+    "#{@role} of #{@master_host} link #{@master_link_status} last_io #{@last_io}"
   end
 
   def parse_info
@@ -75,12 +77,16 @@ class CheckRedisReplication
     end
   end
 
+  def parse_role(value)
+    @role = value
+  end
+  
   def parse_master_host(value)
     @master_host = value
   end
 
-  def parse_master_last_io_seconds(value)
-    @master_last_io_seconds = value
+  def parse_master_last_io_seconds_ago(value)
+    @last_io = value
   end
 
   def parse_master_link_status(value)
