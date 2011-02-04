@@ -9,7 +9,8 @@ options = {:host => 'localhost',
           :db => 0,
           :password => nil,
           :timeout => 3,
-          :last_io => 300}
+          :lag_io => 30,
+          :max_io => 300}
 
 optparser = OptionParser.new do |opt|
   opt.banner = "Usage: #{$0} -H <hostname> [options]"
@@ -17,7 +18,8 @@ optparser = OptionParser.new do |opt|
   opt.on('-p', '--port', 'Port (Default: "6379")') {|o| options[:port] = o if o }
   opt.on('-P', '--password PASSWORD', 'Password (Default: blank)') {|o| options[:password] = o if o }
   opt.on('-T', '--timeout', 'Timeout in seconds (Default: 3)') {|o| options[:timeout] = o if o }
-  opt.on('-L', '--last_io SECONDS', "Max master_last_io_seconds") {|o| options[:last_io] = o.to_i if o}
+  opt.on('-M', '--max_io SECONDS', "Max master_last_io_seconds") {|o| options[:max_io] = o.to_i if o}
+  opt.on('-L', '--lag_io SECONDS', "Max master_last_io_seconds") {|o| options[:lag_io] = o.to_i if o}
 end
 
 args = []
@@ -54,12 +56,15 @@ class CheckRedisReplication
     parse_info
     status = get_status
     if (@role == "slave" && @master_link_status == "up" && @last_io)
-      if (@last_io.to_i < @options[:last_io])
+      if (@last_io.to_i < @options[:lag_io])
         print "OK - #{status}"
         exit 0
-      else
+      elsif (@last_io.to_i < @options[:max_io])
         print "WARN LAG - #{status}"
         exit 1
+      else
+        print "CRITICAL LINK TIMEOUT - #{status}"
+        exit 2
       end
     else
       print "CRITICAL LINK DOWN - #{status}"
