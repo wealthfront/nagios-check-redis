@@ -57,18 +57,18 @@ class CheckRedisReplication
     status = get_status
     if (@role == "slave" && @master_link_status == "up" && @last_io)
       if (@last_io.to_i < @options[:lag_io])
-        print "OK - #{status}"
+        print "OK - #{status}\n"
         exit 0
       elsif (@last_io.to_i < @options[:max_io])
-        print "WARN LAG - #{status}"
+        print "WARN LAG - #{status}\n"
         exit 1
       else
-        print "CRITICAL LINK TIMEOUT - #{status}"
+        print "CRITICAL LINK TIMEOUT - #{status}\n"
         exit 2
       end
     else
-      print "CRITICAL LINK DOWN - #{status}"
-      print 2
+      print "CRITICAL LINK DOWN - #{status}\n"
+      exit 2
     end
   end
 
