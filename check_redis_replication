@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'rubygems'
+require 'redis'
+
+options = {:host => 'localhost',
+          :port => 6379,
+          :db => 0,
+          :password => nil,
+          :timeout => 3}
+
+optparser = OptionParser.new do |opt|
+  opt.banner = "Usage: #{$0} -H <hostname> [options]"
+  opt.on('-H', '--host HOSTNAME', 'Hostname') {|o| options[:host] = o if o }
+  opt.on('-p', '--port', 'Port (Default: "6379")') {|o| options[:port] = o if o }
+  opt.on('-P', '--password PASSWORD', 'Password (Default: blank)') {|o| options[:password] = o if o }
+  opt.on('-T', '--timeout', 'Timeout in seconds (Default: 3)') {|o| options[:timeout] = o if o }
+  opt.on('-L', '--last_io', "Max master_last_io_seconds") {|o| options[:last_io] = o if o}
+end
+
+args = []
+begin
+  args = optparser.parse!
+rescue => e
+  $stderr.print e
+  $stderr.print optparser
+  exit 0
+end
+
+class CheckRedisReplication
+
+  def initialize(opts)
+    @keys = %w(master_host master_last_io_seconds master_link_status role)
+    @r = Redis.new(opts)
+    gather_stats
+  rescue Errno::ECONNREFUSED
+    print "CRITICAL - Connection refused.\n"
+    exit 2
+  rescue Errno::ENETUNREACH
+    print "CRITICAL - Network is unreachable.\n"
+    exit 2
+  rescue Errno::EHOSTUNREACH
+    print "CRITICAL - No route to host.\n"
+    exit 2
+  end
+
+  private
+
+  def gather_stats
+    @info = @r.info
+    parse_info
+    status = get_status
+    if (@role == "slave" && master_link_status == "up" && @master_last_io_seconds)
+      if (@master_last_io_seconds.to_i < 300)
+        print "OK - #{status}"
+        exit 0
+      else
+        print "WARN LAG - #{status}"
+        exit 1
+      end
+    else
+      print "CRITICAL LINK DOWN - #{status}"
+      print 2
+    end
+  end
+
+  def get_status
+    "#{@role} of #{@master_host} link #{@master_link_status} last_io #{@master_last_io_seconds}"
+  end
+
+  def parse_info
+    @info.each do |key,value|
+      send("parse_#{key}".to_sym, value) if @keys.include? key.to_s
+    end
+  end
+
+  def parse_master_host(value)
+    @master_host = value
+  end
+
+  def parse_master_last_io_seconds(value)
+    @master_last_io_seconds = value
+  end
+
+  def parse_master_link_status(value)
+    @master_link_status = value
+  end
+end
+
+CheckRedisReplication.new(options)
