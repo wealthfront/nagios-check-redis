@@ -26,48 +26,49 @@ args = []
 begin
   args = optparser.parse!
 rescue => e
-  $stderr.print e
-  $stderr.print optparser
+  $stderr.puts e
+  $stderr.puts optparser
   exit 0
 end
 
 class CheckRedisReplication
+  KEYS = %w(master_host master_last_io_seconds_ago master_link_status role)
 
   def initialize(opts)
     @options = opts
-    @keys = %w(master_host master_last_io_seconds_ago master_link_status role)
-    @r = Redis.new(opts)
-    gather_stats
+  end
+
+  def check
+    process Redis.new(@options)
   rescue Errno::ECONNREFUSED
-    print "CRITICAL - Connection refused.\n"
+    puts "CRITICAL: Connection refused."
     exit 2
   rescue Errno::ENETUNREACH
-    print "CRITICAL - Network is unreachable.\n"
+    puts "CRITICAL: Network is unreachable."
     exit 2
   rescue Errno::EHOSTUNREACH
-    print "CRITICAL - No route to host.\n"
+    puts "CRITICAL: No route to host."
     exit 2
   end
 
   private
 
-  def gather_stats
-    @info = @r.info
-    parse_info
+  def process(redis)
+    parse redis.info
     status = get_status
     if (@role == "slave" && @master_link_status == "up" && @last_io)
       if (@last_io.to_i < @options[:lag_io])
-        print "OK - #{status}\n"
+        puts "OK: #{status}"
         exit 0
       elsif (@last_io.to_i < @options[:max_io])
-        print "WARN LAG - #{status}\n"
+        puts "WARNING: LAG #{status}"
         exit 1
       else
-        print "CRITICAL LINK TIMEOUT - #{status}\n"
+        puts "CRITICAL: LINK TIMEOUT #{status}"
         exit 2
       end
     else
-      print "CRITICAL LINK DOWN - #{status}\n"
+      puts "CRITICAL: LINK DOWN #{status}"
       exit 2
     end
   end
@@ -76,9 +77,9 @@ class CheckRedisReplication
     "#{@role} of #{@master_host} link #{@master_link_status} last_io #{@last_io}"
   end
 
-  def parse_info
-    @info.each do |key,value|
-      send("parse_#{key}".to_sym, value) if @keys.include? key.to_s
+  def parse(info)
+    info.each do |key,value|
+      send("parse_#{key}".to_sym, value) if KEYS.include? key.to_s
     end
   end
 
@@ -99,4 +100,4 @@ class CheckRedisReplication
   end
 end
 
-CheckRedisReplication.new(options)
+CheckRedisReplication.new(options).check

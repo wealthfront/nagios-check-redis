@@ -34,13 +34,13 @@ class CheckRedis
     @r = Redis.new(opts)
     gather_stats
   rescue Errno::ECONNREFUSED
-    print "CRITICAL - Connection refused.\n"
+    puts "CRITICAL: Connection refused."
     exit 2
   rescue Errno::ENETUNREACH
-    print "CRITICAL - Network is unreachable.\n"
+    puts "CRITICAL: Network is unreachable."
     exit 2
   rescue Errno::EHOSTUNREACH
-    print "CRITICAL - No route to host.\n"
+    puts "CRITICAL: No route to host."
     exit 2
   end
 
@@ -49,13 +49,12 @@ class CheckRedis
   def gather_stats
     @info = @r.info
     parse_info
-    output_status
-    print @status
+    puts get_status
     exit 0
   end
 
-  def output_status
-    @status = "OK - version: #{@redis_version} | memory: #{@used_memory_human}\n"
+  def get_status
+    "OK: version: #{@redis_version} | memory: #{@used_memory_human}"
   end
 
   def parse_info
