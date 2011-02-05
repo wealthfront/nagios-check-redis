@@ -26,9 +26,8 @@ args = []
 begin
   args = optparser.parse!
 rescue => e
-  $stderr.puts e
-  $stderr.puts optparser
-  exit 0
+  puts "UNKNOWN: blew up parsing options #{e.to_s}"
+  exit 4
 end
 
 class CheckRedisReplication
@@ -74,7 +73,7 @@ class CheckRedisReplication
   end
 
   def get_status
-    "#{@role} of #{@master_host} link #{@master_link_status} last_io #{@last_io}"
+    "#{@role} of #{@master_host} link #{@master_link_status}|last_io=#{@last_io}s"
   end
 
   def parse(info)

@@ -22,15 +22,14 @@ args = []
 begin
   args = optparser.parse!
 rescue => e
-  $stderr.print e
-  $stderr.print optparser
-  exit 0
+  puts "UNKNOWN: blew up parsing options #{e.to_s}"
+  exit 4
 end
 
 class CheckRedis
 
   def initialize(opts)
-    @keys = %w(last_save_time redis_version total_connections_received connected_clients total_commands_processed connected_slaves uptime_in_seconds used_memory_human uptime_in_days changes_since_last_save)
+    @keys = %w(last_save_time redis_version total_connections_received connected_clients total_commands_processed connected_slaves uptime_in_seconds used_memory uptime_in_days changes_since_last_save)
     @r = Redis.new(opts)
     gather_stats
   rescue Errno::ECONNREFUSED
@@ -54,7 +53,7 @@ class CheckRedis
   end
 
   def get_status
-    "OK: version: #{@redis_version} | memory: #{@used_memory_human}"
+    "OK: version: #{@redis_version}|memory=#{@used_memory}B uptime=#{@uptime_in_seconds}s dirty=#{@changes_since_last_save} clients=#{@connected_clients} processed=#{@total_commands_processed}c"
   end
 
   def parse_info
@@ -91,7 +90,7 @@ class CheckRedis
     @uptime_in_seconds = value
   end
 
-  def parse_used_memory_human(value)
+  def parse_used_memory(value)
     @used_memory_human = value
   end
 
