@@ -91,7 +91,7 @@ class CheckRedis
   end
 
   def parse_used_memory(value)
-    @used_memory_human = value
+    @used_memory = value
   end
 
   def parse_uptime_in_days(value)
