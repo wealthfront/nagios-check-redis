@@ -73,7 +73,7 @@ class CheckRedisReplication
   end
 
   def get_status
-    "#{@role} of #{@master_host} link #{@master_link_status}|last_io=#{@last_io}s"
+    "#{@role} of #{@master_host} link #{@master_link_status} last #{@last_io}|last_io=#{@last_io}s"
   end
 
   def parse(info)
